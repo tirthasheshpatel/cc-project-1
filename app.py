@@ -43,8 +43,8 @@ while True:
         script_dir: str = "/home/ubuntu"
         env = dict(os.environ)
 
-        res: Any = subprocess.call(
-            ["python", "image_classification.py", img_add],
+        res = subprocess.run(
+            ["python3", "image_classification.py", img_name],
             env=env,
             cwd=script_dir,
             stdout=subprocess.PIPE,
@@ -75,7 +75,9 @@ while True:
             ReceiptHandle=msg["Messages"][0]["ReceiptHandle"],
         )
 
+        os.remove(img_add)
+        os.remove(img_add + "-output.txt")
         print(f"{output}")
-    except:
+    except Exception as e:
         print("Sleep for 5 sec...")
         time.sleep(5)
