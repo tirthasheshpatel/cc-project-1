@@ -2,7 +2,7 @@
 """Setup the Python environment to run the web and app scripts."""
 
 from typing import List
-
+import pathlib
 import os
 import sys
 import subprocess
@@ -20,7 +20,7 @@ def main(args: List[str]) -> None:
         )
 
     # the directory the script is running in
-    script_dir = "/home/ubuntu"
+    script_dir = pathlib.Path(__file__).parent
     env = dict(os.environ)
 
     # install latest setuptools: need to do this because setuptools < 60.0.0
@@ -61,8 +61,8 @@ def main(args: List[str]) -> None:
     if ret == 0:
         print(
             "Setup completed successfully! Now you are ready to run the "
-            "server and client. Run `./server.py [args]` and "
-            "`./client.py [args]` to start the server and client."
+            "app and web. Run `python3 web.py` and "
+            "`python3 app.py` to start the app and web."
         )
     else:
         print("Setup failed!")

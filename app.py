@@ -1,4 +1,5 @@
-from typing import Any
+import logging
+import random
 import subprocess
 import sys
 import time
@@ -6,14 +7,17 @@ import boto3
 import base64
 import os
 
+
 sqs = boto3.client("sqs")
 s3 = boto3.client("s3")
+
 request_queue_url: str = (
     "https://sqs.us-east-1.amazonaws.com/674846823680/cc-project-1-request-queue"
 )
 response_queue_url: str = (
     "https://sqs.us-east-1.amazonaws.com/674846823680/cc-project-1-response-queue"
 )
+
 input_bucket_name: str = "cc-project-1-input"
 output_bucket_name: str = "cc-project-1-output"
 
@@ -24,20 +28,30 @@ def upload_file(file_name: str, bucket: str) -> bool:
     return True
 
 
-while True:
-    try:
-        msg = sqs.receive_message(
-            QueueUrl=request_queue_url,
-            AttributeNames=["All"],
-            MessageAttributeNames=["All"],
-        )
-        bytes = str.encode(msg["Messages"][0]["Body"])
+def main(logger: logging.Logger) -> None:
+    while True:
+        while True:
+            try:
+                msg = sqs.receive_message(
+                    QueueUrl=request_queue_url,
+                    AttributeNames=["All"],
+                    MessageAttributeNames=["All"],
+                )
+                bytes = str.encode(msg["Messages"][0]["Body"])
+                break
+            except KeyError:  # `msg` does not have a 'Messages' key => no new message
+                wait_time = random.random() * 3 + 1
+                time.sleep(wait_time)
+                logger.info(f"Request queue empty. Retrying in {wait_time} seconds.")
 
         img_name = msg["Messages"][0]["MessageAttributes"]["ImageName"]["StringValue"]
-        img_add: str = f"/home/ubuntu/{img_name}"
+        logger.info(f"New image `{img_name}` received, now processing.")
+
+        input_path: str = f"/home/ubuntu/{img_name}"
+        output_path: str = f"/home/ubuntu/{img_name}-output.txt"
 
         img_bytes = base64.b64decode((bytes))
-        with open(img_add, "wb") as file:
+        with open(input_path, "wb") as file:
             file.write(img_bytes)
 
         script_dir: str = "/home/ubuntu"
@@ -51,13 +65,16 @@ while True:
             stderr=subprocess.PIPE,
         )
         if res.returncode != 0:
-            print("Image classification script failed with error:\n")
-            print(res.stderr.decode("utf-8"))
+            logger.critical(
+                "Image classification script failed with error:", exc_info=True
+            )
             sys.exit(1)
         output = res.stdout.decode("utf-8")
 
-        with open(img_add + "-output.txt", "w") as f:
+        with open(output_path, "w") as f:
             f.write(output)
+
+        logger.info(f"Image `{img_name}` processed.")
 
         msg_response = sqs.send_message(
             QueueUrl=response_queue_url,
@@ -67,17 +84,30 @@ while True:
             MessageBody=output,
         )
 
-        upload_file(img_add, input_bucket_name)
-        upload_file(img_add + "-output.txt", output_bucket_name)
+        logger.info(f"Send output of `{img_name}` to the response queue.")
+
+        upload_file(input_path, input_bucket_name)
+        upload_file(output_path, output_bucket_name)
+
+        logger.info(
+            f"Saved `{input_path}` and `{output_path}` in their respective S3 buckets."
+        )
 
         del_responce = sqs.delete_message(
             QueueUrl=request_queue_url,
             ReceiptHandle=msg["Messages"][0]["ReceiptHandle"],
         )
 
-        os.remove(img_add)
-        os.remove(img_add + "-output.txt")
-        print(f"{output}")
-    except Exception as e:
-        print("Sleep for 5 sec...")
-        time.sleep(5)
+        logger.info(
+            f"All tasks completed successfully. Deleted `{img_name}` from the request queue."
+        )
+
+        os.remove(input_path)
+        os.remove(output_path)
+
+
+if __name__ == "__main__":
+    logging.basicConfig()
+    logger = logging.getLogger("app")
+    logger.setLevel(logging.INFO)
+    main(logger)

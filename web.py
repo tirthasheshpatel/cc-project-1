@@ -1,3 +1,4 @@
+import logging
 import boto3
 import time
 import base64
@@ -6,14 +7,15 @@ import random
 from flask import Flask, request
 from werkzeug.utils import secure_filename
 
+logging.basicConfig(filename="web.log", filemode="w")
+logger = logging.getLogger("web")
+logger.setLevel(logging.INFO)
 
 UPLOAD_FOLDER: str = "./data"
 application = Flask(__name__)
 application.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-
 sqs = boto3.client("sqs")
-
 
 request_queue_url: str = (
     "https://sqs.us-east-1.amazonaws.com/674846823680/cc-project-1-request-queue"
@@ -25,6 +27,7 @@ response_queue_url: str = (
 
 @application.route("/")
 def hello_world() -> str:
+    logger.info("Home page accessed.")
     return "Hello World! Go to the upload page to upload your images!"
 
 
@@ -32,54 +35,56 @@ def hello_world() -> str:
 def upload() -> None | str:
     if request.method == "POST":
         file = request.files.getlist("myfile")[0]
-        if file.filename is None:
-            return ""
+        logger.info(f"Received file `{file.filename}`.")
+        if file.filename is None or not os.path.basename(file.filename).lower().endswith('jpeg'):
+            logger.warning("Invalid file received!")
+            return "Invalid file received!"
         filename = secure_filename(file.filename)
         path = os.path.join(application.config["UPLOAD_FOLDER"], filename)
-        file.save(path)
+        file.save(path)  # Upload the image
+        logger.info(f"Uploaded image `{file.filename}`.")
         with open(path, "rb") as image2string:
             bytes = base64.b64encode(image2string.read())
         sqs.send_message(
             QueueUrl=request_queue_url,
             MessageAttributes={
-                "ImageName": {"DataType": "String", "StringValue": filename}
+                "ImageName": {"DataType": "String", "StringValue": os.path.basename(filename)}
             },
             MessageBody=bytes.decode("ascii"),
         )
+        logger.info(f"Sent image `{os.path.basename(filename)}` to the request queue.")
 
+        logger.info("Now waiting for response.")
         while True:
-            try:
-                queue_attr = sqs.get_queue_attributes(
-                    QueueUrl=response_queue_url, AttributeNames=["All"]
+            queue_attr = sqs.get_queue_attributes(
+                QueueUrl=response_queue_url, AttributeNames=["All"]
+            )
+            num_visible_msg = int(
+                queue_attr["Attributes"]["ApproximateNumberOfMessages"]
+            )
+            logger.info(f"Number of visible messages in the response queue: {num_visible_msg}")
+            if num_visible_msg > 0:
+                logger.info("Checking for a response.")
+                msg = sqs.receive_message(
+                    QueueUrl=response_queue_url,
+                    AttributeNames=["All"],
+                    MessageAttributeNames=["All"],
                 )
-                num_visible_msg = int(
-                    queue_attr["Attributes"]["ApproximateNumberOfMessages"]
-                )
-                print(f"Number of visible messages: {num_visible_msg}")
-                if num_visible_msg > 0:
-                    msg = sqs.receive_message(
-                        QueueUrl=response_queue_url,
-                        AttributeNames=["All"],
-                        MessageAttributeNames=["All"],
-                    )
-                    body = msg["Messages"][0]["Body"]
+                for message in msg["Messages"]:
+                    body = message["Body"]
                     filename, result = body.split(",")
-                    print(f"Received `{body}`")
-                    if filename != file.filename:
-                        continue
-                    sqs.delete_message(
-                        QueueUrl=response_queue_url,
-                        ReceiptHandle=msg["Messages"][0]["ReceiptHandle"],
-                    )
-                    print("Returning response")
-                    return f"Result for file '{filename}': {result}"
-                else:
-                    time.sleep(random.random() * 3 + 1)
-                    continue
-            except Exception as e:
-                print("Exception Occured...")
-                print(e)
-                time.sleep(random.random() * 3 + 1)
+                    if filename == file.filename:
+                        logger.info(f"Response found: `{body}`")
+                        sqs.delete_message(
+                            QueueUrl=response_queue_url,
+                            ReceiptHandle=message["ReceiptHandle"],
+                        )
+                        logger.info("Deleted response from queue. Returning response.")
+                        return f"Result for file '{filename}': {result}"
+            else:
+                wait_time = random.random() * 3 + 1
+                logger.info(f"Response not found. Retrying after {wait_time} seconds.")
+                time.sleep(wait_time)
 
 
 if __name__ == "__main__":
