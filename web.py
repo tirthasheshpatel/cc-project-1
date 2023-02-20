@@ -63,7 +63,7 @@ def upload() -> None | str:
                     QueueUrl=response_queue_url,
                     AttributeNames=["All"],
                     MessageAttributeNames=["All"],
-                    WaitTimeSeconds=123,
+                    WaitTimeSeconds=20,
                     MaxNumberOfMessages=1
                 )
             body = msg["Messages"][0]["Body"]

@@ -37,7 +37,7 @@ def main(logger: logging.Logger) -> None:
                 QueueUrl=request_queue_url,
                 AttributeNames=["All"],
                 MessageAttributeNames=["All"],
-                WaitTimeSeconds=123,
+                WaitTimeSeconds=20,
                 MaxNumberOfMessages=1
             )
         bytes = str.encode(msg["Messages"][0]["Body"])
