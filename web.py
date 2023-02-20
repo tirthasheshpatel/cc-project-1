@@ -7,7 +7,7 @@ import random
 from flask import Flask, request
 from werkzeug.utils import secure_filename
 
-logging.basicConfig(filename="web.log", filemode="w")
+logging.basicConfig()
 logger = logging.getLogger("web")
 logger.setLevel(logging.INFO)
 
@@ -56,35 +56,26 @@ def upload() -> None | str:
 
         logger.info("Now waiting for response.")
         while True:
-            queue_attr = sqs.get_queue_attributes(
-                QueueUrl=response_queue_url, AttributeNames=["All"]
-            )
-            num_visible_msg = int(
-                queue_attr["Attributes"]["ApproximateNumberOfMessages"]
-            )
-            logger.info(f"Number of visible messages in the response queue: {num_visible_msg}")
-            if num_visible_msg > 0:
-                logger.info("Checking for a response.")
+            msg = {}
+            while 'Messages' not in msg:
+                logger.info(f"Checking the response queue for a response.")
                 msg = sqs.receive_message(
                     QueueUrl=response_queue_url,
                     AttributeNames=["All"],
                     MessageAttributeNames=["All"],
+                    WaitTimeSeconds=123,
+                    MaxNumberOfMessages=1
                 )
-                for message in msg["Messages"]:
-                    body = message["Body"]
-                    filename, result = body.split(",")
-                    if filename == file.filename:
-                        logger.info(f"Response found: `{body}`")
-                        sqs.delete_message(
-                            QueueUrl=response_queue_url,
-                            ReceiptHandle=message["ReceiptHandle"],
-                        )
-                        logger.info("Deleted response from queue. Returning response.")
-                        return f"Result for file '{filename}': {result}"
-            else:
-                wait_time = random.random() * 3 + 1
-                logger.info(f"Response not found. Retrying after {wait_time} seconds.")
-                time.sleep(wait_time)
+            body = msg["Messages"][0]["Body"]
+            filename, result = body.split(",")
+            if filename == file.filename:
+                logger.info(f"Response found: `{body}`")
+                sqs.delete_message(
+                    QueueUrl=response_queue_url,
+                    ReceiptHandle=msg["Messages"][0]["ReceiptHandle"],
+                )
+                logger.info("Deleted response from queue. Returning response.")
+                return f"Result for file '{filename}': {result}"
 
 
 if __name__ == "__main__":

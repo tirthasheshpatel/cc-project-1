@@ -30,19 +30,17 @@ def upload_file(file_name: str, bucket: str) -> bool:
 
 def main(logger: logging.Logger) -> None:
     while True:
-        while True:
-            try:
-                msg = sqs.receive_message(
-                    QueueUrl=request_queue_url,
-                    AttributeNames=["All"],
-                    MessageAttributeNames=["All"],
-                )
-                bytes = str.encode(msg["Messages"][0]["Body"])
-                break
-            except KeyError:  # `msg` does not have a 'Messages' key => no new message
-                wait_time = random.random() * 3 + 1
-                time.sleep(wait_time)
-                logger.info(f"Request queue empty. Retrying in {wait_time} seconds.")
+        msg = {}
+        while "Messages" not in msg:
+            logger.info("Checking the request queue for requests.")
+            msg = sqs.receive_message(
+                QueueUrl=request_queue_url,
+                AttributeNames=["All"],
+                MessageAttributeNames=["All"],
+                WaitTimeSeconds=123,
+                MaxNumberOfMessages=1
+            )
+        bytes = str.encode(msg["Messages"][0]["Body"])
 
         img_name = msg["Messages"][0]["MessageAttributes"]["ImageName"]["StringValue"]
         logger.info(f"New image `{img_name}` received, now processing.")
