@@ -66,14 +66,13 @@ def upload() -> None | str:
                 )
             body = msg["Messages"][0]["Body"]
             filename, result = body.split(",")
-            if filename == file.filename:
-                logger.info(f"Response found: `{body}`")
-                sqs.delete_message(
-                    QueueUrl=response_queue_url,
-                    ReceiptHandle=msg["Messages"][0]["ReceiptHandle"],
-                )
-                logger.info("Deleted response from queue. Returning response.")
-                return f"Result for file '{filename}': {result}"
+            logger.info(f"New Response: `{body}`")
+            sqs.delete_message(
+                QueueUrl=response_queue_url,
+                ReceiptHandle=msg["Messages"][0]["ReceiptHandle"],
+            )
+            logger.info("Deleted response from queue. Returning response.")
+            return f"Result for file '{filename}': {result}"
 
 
 if __name__ == "__main__":

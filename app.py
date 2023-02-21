@@ -65,7 +65,7 @@ def main(logger: logging.Logger) -> None:
                 "Image classification script failed with error:", exc_info=True
             )
             sys.exit(1)
-        output = res.stdout.decode("utf-8")
+        output = res.stdout.decode("utf-8").strip("\n")
 
         with open(output_path, "w") as f:
             f.write(output)
