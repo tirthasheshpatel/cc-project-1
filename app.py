@@ -1,8 +1,6 @@
 import logging
-import random
 import subprocess
 import sys
-import time
 import boto3
 import base64
 import os
