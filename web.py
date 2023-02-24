@@ -1,3 +1,4 @@
+from typing import Dict
 import logging
 import boto3
 import base64
@@ -5,7 +6,7 @@ import os
 from flask import Flask, request
 from werkzeug.utils import secure_filename
 
-logging.basicConfig()
+logging.basicConfig(format="[%(asctime)s] %(name)s:%(levelname)s (%(filename)s:%(lineno)d) -> %(message)s")
 logger = logging.getLogger("web")
 logger.setLevel(logging.INFO)
 
@@ -24,7 +25,7 @@ response_queue_url: str = (
 
 
 @application.route("/")
-def hello_world() -> str:
+def index() -> str:
     logger.info("Home page accessed.")
     return "Hello World! Go to the upload page to upload your images!"
 
@@ -32,7 +33,10 @@ def hello_world() -> str:
 @application.route("/upload", methods=["POST", "GET"])  # type: ignore
 def upload() -> None | str:
     if request.method == "POST":
-        file = request.files.getlist("myfile")[0]
+        if "myfile" not in request.files:
+            logger.error("Can't find uploaded file")
+            return "Can't find uploaded file"
+        file = request.files["myfile"]
         logger.info(f"Received file `{file.filename}`.")
         if file.filename is None or not os.path.basename(file.filename).lower().endswith('jpeg'):
             logger.warning("Invalid file received!")
@@ -54,25 +58,26 @@ def upload() -> None | str:
 
         logger.info("Now waiting for response.")
         while True:
-            msg = {}
-            while 'Messages' not in msg:
-                logger.info(f"Checking the response queue for a response.")
-                msg = sqs.receive_message(
-                    QueueUrl=response_queue_url,
-                    AttributeNames=["All"],
-                    MessageAttributeNames=["All"],
-                    WaitTimeSeconds=20,
-                    MaxNumberOfMessages=1
-                )
-            body = msg["Messages"][0]["Body"]
-            filename, result = body.split(",")
-            logger.info(f"New Response: `{body}`")
-            sqs.delete_message(
+            logger.info(f"Checking the response queue for a response.")
+            msg = sqs.receive_message(
                 QueueUrl=response_queue_url,
-                ReceiptHandle=msg["Messages"][0]["ReceiptHandle"],
+                AttributeNames=["All"],
+                MessageAttributeNames=["All"],
+                WaitTimeSeconds=20,
+                MaxNumberOfMessages=1
             )
-            logger.info("Deleted response from queue. Returning response.")
-            return f"Result for file '{filename}': {result}"
+            message = msg.get('Messages', [None])[0]
+            if message is not None:
+                body = message["Body"]
+                filename, result = body.split(",")
+                logger.info(f"New Response: `{body}`")
+                sqs.delete_message(
+                    QueueUrl=response_queue_url,
+                    ReceiptHandle=message["ReceiptHandle"],
+                )
+                logger.info("Deleted response from queue. Returning response.")
+                return f"Result for file '{filename}': {result}"
+
 
 
 if __name__ == "__main__":

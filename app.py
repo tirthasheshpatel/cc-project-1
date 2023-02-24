@@ -72,7 +72,7 @@ def main(logger: logging.Logger) -> None:
 
         logger.info(f"Image `{img_name}` processed.")
 
-        msg_response = sqs.send_message(
+        sqs.send_message(
             QueueUrl=response_queue_url,
             MessageAttributes={
                 "ImageName": {"DataType": "String", "StringValue": img_name}
@@ -89,7 +89,7 @@ def main(logger: logging.Logger) -> None:
             f"Saved `{input_path}` and `{output_path}` in their respective S3 buckets."
         )
 
-        del_responce = sqs.delete_message(
+        sqs.delete_message(
             QueueUrl=request_queue_url,
             ReceiptHandle=msg["Messages"][0]["ReceiptHandle"],
         )
@@ -103,7 +103,7 @@ def main(logger: logging.Logger) -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig()
+    logging.basicConfig(format="[%(asctime)s] %(name)s:%(levelname)s (%(filename)s:%(lineno)d) -> %(message)s")
     logger = logging.getLogger("app")
     logger.setLevel(logging.INFO)
     main(logger)
