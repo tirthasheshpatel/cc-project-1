@@ -82,8 +82,8 @@ def main(logger: logging.Logger) -> None:
 
         logger.info(f"Send output of `{img_name}` to the response queue.")
 
-        upload_file(input_path, input_bucket_name)
-        upload_file(output_path, output_bucket_name)
+        # upload_file(input_path, input_bucket_name)
+        # upload_file(output_path, output_bucket_name)
 
         logger.info(
             f"Saved `{input_path}` and `{output_path}` in their respective S3 buckets."
