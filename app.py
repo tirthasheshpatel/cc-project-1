@@ -62,7 +62,7 @@ def main(logger: logging.Logger) -> None:
         )
         if res.returncode != 0:
             logger.critical(
-                "Image classification script failed with error:", exc_info=True
+                f"Image classification script failed with error:\n{res.stderr.decode('utf-8')}"
             )
             sys.exit(1)
         output = res.stdout.decode("utf-8").strip("\n")
