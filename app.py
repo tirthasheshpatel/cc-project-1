@@ -54,7 +54,7 @@ def main(logger: logging.Logger) -> None:
         env = dict(os.environ)
 
         res = subprocess.run(
-            ["python3", "image_classification.py", img_name],
+            ["su", "ubuntu", "-c", "python3", "image_classification.py", img_name],
             env=env,
             cwd=script_dir,
             stdout=subprocess.PIPE,
