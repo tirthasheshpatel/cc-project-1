@@ -101,7 +101,7 @@ def main(logger: logging.Logger) -> None:
 
         os.remove(input_path)
         os.remove(output_path)
-        time.sleep(3)
+        time.sleep(7)
 
 
 if __name__ == "__main__":
