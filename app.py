@@ -4,6 +4,7 @@ import sys
 import boto3
 import base64
 import os
+import time
 
 
 sqs = boto3.client("sqs")
@@ -36,7 +37,7 @@ def main(logger: logging.Logger) -> None:
                 AttributeNames=["All"],
                 MessageAttributeNames=["All"],
                 WaitTimeSeconds=20,
-                MaxNumberOfMessages=1
+                MaxNumberOfMessages=1,
             )
         bytes = str.encode(msg["Messages"][0]["Body"])
 
@@ -100,10 +101,13 @@ def main(logger: logging.Logger) -> None:
 
         os.remove(input_path)
         os.remove(output_path)
+        time.sleep(3)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format="[%(asctime)s] %(name)s:%(levelname)s (%(filename)s:%(lineno)d) -> %(message)s")
+    logging.basicConfig(
+        format="[%(asctime)s] %(name)s:%(levelname)s (%(filename)s:%(lineno)d) -> %(message)s"
+    )
     logger = logging.getLogger("app")
     logger.setLevel(logging.INFO)
     main(logger)

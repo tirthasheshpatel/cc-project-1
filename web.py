@@ -6,7 +6,9 @@ import os
 from flask import Flask, request
 from werkzeug.utils import secure_filename
 
-logging.basicConfig(format="[%(asctime)s] %(name)s:%(levelname)s (%(filename)s:%(lineno)d) -> %(message)s")
+logging.basicConfig(
+    format="[%(asctime)s] %(name)s:%(levelname)s (%(filename)s:%(lineno)d) -> %(message)s"
+)
 logger = logging.getLogger("web")
 logger.setLevel(logging.INFO)
 
@@ -38,7 +40,9 @@ def upload() -> None | str:
             return "Can't find uploaded file"
         file = request.files["myfile"]
         logger.info(f"Received file `{file.filename}`.")
-        if file.filename is None or not os.path.basename(file.filename).lower().endswith('jpeg'):
+        if file.filename is None or not os.path.basename(
+            file.filename
+        ).lower().endswith("jpeg"):
             logger.warning("Invalid file received!")
             return "Invalid file received!"
         filename = secure_filename(file.filename)
@@ -50,7 +54,10 @@ def upload() -> None | str:
         sqs.send_message(
             QueueUrl=request_queue_url,
             MessageAttributes={
-                "ImageName": {"DataType": "String", "StringValue": os.path.basename(filename)}
+                "ImageName": {
+                    "DataType": "String",
+                    "StringValue": os.path.basename(filename),
+                }
             },
             MessageBody=bytes.decode("ascii"),
         )
@@ -64,9 +71,9 @@ def upload() -> None | str:
                 AttributeNames=["All"],
                 MessageAttributeNames=["All"],
                 WaitTimeSeconds=20,
-                MaxNumberOfMessages=1
+                MaxNumberOfMessages=1,
             )
-            message = msg.get('Messages', [None])[0]
+            message = msg.get("Messages", [None])[0]
             if message is not None:
                 body = message["Body"]
                 filename, result = body.split(",")
@@ -77,7 +84,6 @@ def upload() -> None | str:
                 )
                 logger.info("Deleted response from queue. Returning response.")
                 return f"Result for file '{filename}': {result}"
-
 
 
 if __name__ == "__main__":
